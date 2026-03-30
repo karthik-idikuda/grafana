@@ -26,6 +26,10 @@ permissions:
 # targz:grafana:* (via make build-targz + pre-seeded dist for Dagger)
 # deb / rpm / docker / zip / msi (Dagger, consuming prebuilt targz from dist when present)
 #
+# One shared frontend artifact is reused for every targz matrix cell (OSS), so assets-manifest.json matches all
+# binaries. For Grafana Cloud / Enterprise / Pro with CDN, do not split frontend and backend across pipelines
+# unless they consume the same frontend output—see pkg/build/daggerbuild/README.md.
+#
 jobs:
   setup:
     name: setup
