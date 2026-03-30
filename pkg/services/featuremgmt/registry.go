@@ -525,6 +525,14 @@ var (
 			Expression:      "false",
 		},
 		{
+			Name:            "datasourcesQuerierRawOutput",
+			Description:     "use raw output mode for the data source querier",
+			Stage:           FeatureStageExperimental,
+			Owner:           grafanaDatasourcesCoreServicesSquad,
+			RequiresRestart: false,
+			Expression:      "false",
+		},
+		{
 			Name:        "cloudWatchBatchQueries",
 			Description: "Runs CloudWatch metrics queries as separate batches",
 			Stage:       FeatureStageGeneralAvailability,
@@ -1489,13 +1497,6 @@ var (
 			Expression:  "true",
 		},
 		{
-			Name:        "k8SFolderCounts",
-			Description: "Enable folder's api server counts",
-			Stage:       FeatureStageExperimental,
-			Owner:       grafanaSearchAndStorageSquad,
-			Expression:  "false",
-		},
-		{
 			Name:        "improvedExternalSessionHandlingSAML",
 			Description: "Enables improved support for SAML external sessions. Ensure the NameID format is correctly configured in Grafana for SAML Single Logout to function properly.",
 			Stage:       FeatureStageGeneralAvailability,
@@ -1529,9 +1530,9 @@ var (
 		{
 			Name:        "grafanaAdvisor",
 			Description: "Enables Advisor app",
-			Stage:       FeatureStagePrivatePreview,
+			Stage:       FeatureStageGeneralAvailability,
 			Owner:       grafanaPluginsPlatformSquad,
-			Expression:  "false",
+			Expression:  "true",
 		},
 		{
 			Name:        "elasticsearchImprovedParsing",
@@ -1954,14 +1955,6 @@ var (
 			Expression:   "false",
 		},
 		{
-			Name:         "alertingImportAlertmanagerUI",
-			Description:  "Enables the UI to see imported Alertmanager configuration",
-			Stage:        FeatureStageExperimental,
-			Owner:        grafanaAlertingSquad,
-			HideFromDocs: true,
-			Expression:   "false",
-		},
-		{
 			Name:         "alertingDisableDMAinUI",
 			Description:  "Disables the DMA feature in the UI",
 			Stage:        FeatureStageExperimental,
@@ -2184,10 +2177,10 @@ var (
 		{
 			Name:         "newVizSuggestions",
 			Description:  "Enable new visualization suggestions",
-			Stage:        FeatureStagePublicPreview,
+			Stage:        FeatureStageGeneralAvailability,
 			FrontendOnly: true,
 			Owner:        grafanaDatavizSquad,
-			Expression:   "false",
+			Expression:   "true",
 		},
 		{
 			Name:         "panelStyleActions",
@@ -2208,10 +2201,10 @@ var (
 		{
 			Name:         "externalVizSuggestions",
 			Description:  "Enable all plugins to supply visualization suggestions (including 3rd party plugins)",
-			Stage:        FeatureStageExperimental,
+			Stage:        FeatureStageGeneralAvailability,
 			FrontendOnly: true,
 			Owner:        grafanaDatavizSquad,
-			Expression:   "false",
+			Expression:   "true",
 		},
 		{
 			Name:         "vizLegendSeriesLimit",
@@ -2756,6 +2749,14 @@ var (
 			Expression:   "false",
 		},
 		{
+			Name:         "streamingForwardTeamHeadersTempo",
+			Description:  "Enables forwarding team headers from tempo for streaming requests with LBAC rules",
+			Stage:        FeatureStagePrivatePreview,
+			Owner:        grafanaOSSBigTent,
+			Expression:   "false",
+			HideFromDocs: true,
+		},
+		{
 			Name:        "lokiAlignedQuerySplitting",
 			Description: "Aligns query splitting chunks with UTC midnight",
 			Stage:       FeatureStageExperimental,
@@ -2767,6 +2768,13 @@ var (
 			Description: "Enables the query service to fetch the configuration from the settings service",
 			Stage:       FeatureStageExperimental,
 			Owner:       grafanaDatasourcesCoreServicesSquad,
+			Expression:  "false",
+		},
+		{
+			Name:        "queryServiceQueryCaching",
+			Description: "Enables the query service to do query caching",
+			Stage:       FeatureStageExperimental,
+			Owner:       grafanaOperatorExperienceSquad,
 			Expression:  "false",
 		},
 	}

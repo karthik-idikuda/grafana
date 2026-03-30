@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMeasure } from 'react-use';
 
 import { AlertLabels, StateText } from '@grafana/alerting/unstable';
-import { GrafanaTheme2, NavModelItem, UrlQueryValue } from '@grafana/data';
+import { type GrafanaTheme2, type NavModelItem, type UrlQueryValue } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
 import {
@@ -20,19 +20,19 @@ import {
   useStyles2,
   withErrorBoundary,
 } from '@grafana/ui';
-import { PageInfoItem } from 'app/core/components/Page/types';
+import { type PageInfoItem } from 'app/core/components/Page/types';
 import { useQueryParams } from 'app/core/hooks/useQueryParams';
 import InfoPausedRule from 'app/features/alerting/unified/components/InfoPausedRule';
 import { RuleActionsButtons } from 'app/features/alerting/unified/components/rules/RuleActionsButtons';
 import {
   AlertInstanceTotalState,
-  AlertInstanceTotals,
-  CombinedRule,
-  RuleGroupIdentifierV2,
-  RuleHealth,
-  RuleIdentifier,
+  type AlertInstanceTotals,
+  type CombinedRule,
+  type RuleGroupIdentifierV2,
+  type RuleHealth,
+  type RuleIdentifier,
 } from 'app/types/unified-alerting';
-import { PromAlertingRuleState, PromRuleType } from 'app/types/unified-alerting-dto';
+import { type PromAlertingRuleState, PromRuleType } from 'app/types/unified-alerting-dto';
 
 import { logError } from '../../Analytics';
 import { defaultPageNav } from '../../RuleViewer';
@@ -47,17 +47,12 @@ import { getAlertRulesNavId } from '../../navigation/useAlertRulesNav';
 import { PluginOriginBadge } from '../../plugins/PluginOriginBadge';
 import { normalizeHealth, normalizeState } from '../../rule-list/components/util';
 import { Annotation } from '../../utils/constants';
-import {
-  GRAFANA_RULES_SOURCE_NAME,
-  getRulesSourceUid,
-  isGrafanaRulesSource,
-  ruleIdentifierToRuleSourceIdentifier,
-} from '../../utils/datasource';
+import { getRulesSourceUid, ruleIdentifierToRuleSourceIdentifier } from '../../utils/datasource';
 import { labelsSize } from '../../utils/labels';
 import { makeDashboardLink, makePanelLink, stringifyErrorLike } from '../../utils/misc';
 import { createListFilterLink, groups } from '../../utils/navigation';
 import {
-  RulePluginOrigin,
+  type RulePluginOrigin,
   getRulePluginOrigin,
   isFederatedRuleGroup,
   isGrafanaRuleIdentifier,
@@ -66,8 +61,7 @@ import {
   rulerRuleType,
 } from '../../utils/rules';
 import { AlertingPageWrapper } from '../AlertingPageWrapper';
-import { InhibitionRulesAlert } from '../InhibitionRulesAlert';
-import { ProvisionedResource, ProvisioningAlert } from '../Provisioning';
+import { ProvisioningBadge } from '../Provisioning';
 import { WithReturnButton } from '../WithReturnButton';
 import { decodeGrafanaNamespace } from '../expressions/util';
 import { RedirectToCloneRule } from '../rules/CloneRule';
@@ -111,7 +105,7 @@ const RuleViewer = () => {
   // of duplicating provisioned alert rules
   const [duplicateRuleIdentifier, setDuplicateRuleIdentifier] = useState<RuleIdentifier>();
   const { returnTo } = useReturnTo('/alerting/list');
-  const { annotations, promRule, rulerRule, namespace } = rule;
+  const { annotations, promRule, rulerRule } = rule;
 
   const hasError = isErrorHealth(promRule?.health);
 
@@ -133,6 +127,8 @@ const RuleViewer = () => {
         <Title
           name={title}
           paused={isPaused}
+          isProvisioned={isProvisioned}
+          provenance={rulerRuleType.grafana.rule(rulerRule) ? rulerRule.grafana_alert.provenance : undefined}
           state={prometheusRuleType.alertingRule(promRule) ? promRule.state : undefined}
           health={promRule?.health}
           ruleType={promRule?.type}
@@ -148,10 +144,6 @@ const RuleViewer = () => {
           {/* alerts and notifications and stuff */}
           {isPaused && <InfoPausedRule />}
           {isFederatedRule && <FederatedRuleWarning />}
-          {/* indicator for rules in a provisioned group */}
-          {isProvisioned && (
-            <ProvisioningAlert resource={ProvisionedResource.AlertRule} bottomSpacing={0} topSpacing={2} />
-          )}
           {/* error state */}
           {showError && (
             <Alert
@@ -171,10 +163,6 @@ const RuleViewer = () => {
       }
     >
       {shouldUseConsistencyCheck && <PrometheusConsistencyCheck ruleIdentifier={identifier} />}
-      {/* Show inhibition rules alert only for Grafana-managed rules */}
-      {isGrafanaRulesSource(namespace.rulesSource) && (
-        <InhibitionRulesAlert alertmanagerSourceName={GRAFANA_RULES_SOURCE_NAME} />
-      )}
       <div className={styles.layout}>
         <Stack direction="column" gap={0}>
           {/* local tab bar — rendered inside the grid so sidebar sits alongside it */}
@@ -281,6 +269,8 @@ const createMetadata = (rule: CombinedRule): PageInfoItem[] => {
 interface TitleProps {
   name: string;
   paused?: boolean;
+  isProvisioned?: boolean;
+  provenance?: string;
   // recording rules don't have a state
   state?: PromAlertingRuleState;
   health?: RuleHealth;
@@ -289,7 +279,17 @@ interface TitleProps {
   returnToHref?: string;
 }
 
-export const Title = ({ name, paused = false, state, health, ruleType, ruleOrigin, returnToHref = '' }: TitleProps) => {
+export const Title = ({
+  name,
+  paused = false,
+  isProvisioned,
+  provenance,
+  state,
+  health,
+  ruleType,
+  ruleOrigin,
+  returnToHref = '',
+}: TitleProps) => {
   const isRecordingRule = ruleType === PromRuleType.Recording;
 
   const { returnTo } = useReturnTo(returnToHref);
@@ -311,6 +311,7 @@ export const Title = ({ name, paused = false, state, health, ruleType, ruleOrigi
       <Text variant="h1" truncate>
         {name}
       </Text>
+      {isProvisioned && <ProvisioningBadge tooltip provenance={provenance} />}
       {/* recording rules won't have a state */}
       {state && <StateText type="alerting" state={textState} health={textHealth} isPaused={paused} />}
       {isRecordingRule && <StateText type="recording" health={textHealth} isPaused={paused} />}
