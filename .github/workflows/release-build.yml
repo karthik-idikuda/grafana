@@ -21,8 +21,6 @@ permissions:
 
 # Builds the following artifacts:
 #
-# npm:grafana
-# storybook
 # targz:grafana:* (via make build-targz + pre-seeded dist for Dagger)
 # deb / rpm / docker / zip / msi (Dagger, consuming prebuilt targz from dist when present)
 #
@@ -300,7 +298,7 @@ jobs:
       matrix:
         include:
           - name: linux-amd64
-            artifacts: deb:grafana:linux/amd64,rpm:grafana:linux/amd64,docker:grafana:linux/amd64,docker:grafana:linux/amd64:ubuntu,npm:grafana,storybook
+            artifacts: deb:grafana:linux/amd64,rpm:grafana:linux/amd64,docker:grafana:linux/amd64,docker:grafana:linux/amd64:ubuntu
             verify: false
           - name: linux-arm64
             artifacts: deb:grafana:linux/arm64,rpm:grafana:linux/arm64,docker:grafana:linux/arm64,docker:grafana:linux/arm64:ubuntu
