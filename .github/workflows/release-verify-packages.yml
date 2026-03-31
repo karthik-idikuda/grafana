@@ -1,0 +1,183 @@
+name: Verify release packages
+
+on:
+  workflow_call:
+    inputs:
+      run-id:
+        description: Run ID where package artifacts were produced
+        required: true
+        type: string
+      packages-artifact-name:
+        description: Name of the uploaded package artifact bundle
+        required: false
+        type: string
+        default: artifacts-linux-amd64
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify ${{ matrix.name }}
+    runs-on: ubuntu-x64-large
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: deb
+            pattern: "*_linux_amd64.deb"
+          - name: rpm
+            pattern: "*_linux_amd64.rpm"
+          - name: docker
+            pattern: "*_linux_amd64.docker.tar.gz"
+          - name: docker-ubuntu
+            pattern: "*_linux_amd64.ubuntu.docker.tar.gz"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Install yarn dependencies
+        uses: ./.github/actions/yarn-install
+
+      - name: Build test plugins
+        run: yarn e2e:plugin:build
+
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: ${{ inputs.packages-artifact-name }}
+          run-id: ${{ inputs.run-id }}
+          path: dist
+
+      - name: Start package under test
+        run: |
+          PACKAGE_PATH="$(find dist -maxdepth 1 -type f -name '${{ matrix.pattern }}' | sort | sed -n '1p')"
+          if [ -z "$PACKAGE_PATH" ]; then
+            echo "No package found for pattern '${{ matrix.pattern }}' in dist/"
+            ls -la dist
+            exit 1
+          fi
+
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
+
+          case '${{ matrix.name }}' in
+            deb)
+              if ! command -v ar >/dev/null 2>&1; then
+                echo "ar is required to extract .deb packages"
+                exit 1
+              fi
+              workdir="$(mktemp -d)"
+              cp "$PACKAGE_PATH" "$workdir/package.deb"
+              (
+                cd "$workdir"
+                ar x package.deb
+              )
+              data_tar="$(find "$workdir" -maxdepth 1 -type f -name 'data.tar.*' | sort | sed -n '1p')"
+              if [ -z "$data_tar" ]; then
+                echo "Could not locate data.tar.* in extracted deb package"
+                exit 1
+              fi
+              mkdir -p grafana-server
+              tar -xf "$data_tar" -C grafana-server
+              GRAFANA_HOME="$PWD/grafana-server/usr/share/grafana"
+              if [ ! -x "$GRAFANA_HOME/bin/grafana" ]; then
+                chmod +x "$GRAFANA_HOME/bin/grafana" || true
+              fi
+              mkdir -p "${RUNNER_TEMP}/grafana-plugins"
+              GF_LOG_LEVEL=error \
+              GF_PATHS_PLUGINS="${RUNNER_TEMP}/grafana-plugins" \
+              "$GRAFANA_HOME/bin/grafana" server \
+                --homepath="$GRAFANA_HOME" \
+                cfg:server.http_port=3001 \
+                > /tmp/release-verify-${{ matrix.name }}.log 2>&1 &
+              echo "$!" > /tmp/release-verify-${{ matrix.name }}.pid
+              echo "SERVER_MODE=host" >> "$GITHUB_ENV"
+              ;;
+            rpm)
+              if ! command -v bsdtar >/dev/null 2>&1; then
+                echo "bsdtar is required to extract .rpm packages without yum"
+                exit 1
+              fi
+              mkdir -p grafana-server
+              bsdtar -xf "$PACKAGE_PATH" -C grafana-server
+              GRAFANA_HOME="$PWD/grafana-server/usr/share/grafana"
+              if [ ! -x "$GRAFANA_HOME/bin/grafana" ]; then
+                chmod +x "$GRAFANA_HOME/bin/grafana" || true
+              fi
+              mkdir -p "${RUNNER_TEMP}/grafana-plugins"
+              GF_LOG_LEVEL=error \
+              GF_PATHS_PLUGINS="${RUNNER_TEMP}/grafana-plugins" \
+              "$GRAFANA_HOME/bin/grafana" server \
+                --homepath="$GRAFANA_HOME" \
+                cfg:server.http_port=3001 \
+                > /tmp/release-verify-${{ matrix.name }}.log 2>&1 &
+              echo "$!" > /tmp/release-verify-${{ matrix.name }}.pid
+              echo "SERVER_MODE=host" >> "$GITHUB_ENV"
+              ;;
+            docker|docker-ubuntu)
+              IMAGE="$(docker load -i "$PACKAGE_PATH" | sed -n 's/^Loaded image: //p' | sed -n '1p')"
+              if [ -z "$IMAGE" ]; then
+                echo "Unable to load Docker image from $PACKAGE_PATH"
+                exit 1
+              fi
+              echo "IMAGE_UNDER_TEST=$IMAGE" >> "$GITHUB_ENV"
+              docker run -d --name grafana-verify -p 3001:3000 "$IMAGE"
+              echo "SERVER_MODE=docker" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "Unsupported package type '${{ matrix.name }}'"
+              exit 1
+              ;;
+          esac
+
+      - name: Install Playwright browsers
+        run: yarn playwright install --with-deps chromium
+
+      - name: Wait for Grafana server to start
+        run: |
+          timeout=120
+          elapsed=0
+          while ! curl -s -f http://localhost:3001/health > /dev/null 2>&1; do
+            if [ $elapsed -ge $timeout ]; then
+              if [ "${SERVER_MODE}" = "docker" ]; then
+                docker logs grafana-verify || true
+              else
+                cat /tmp/release-verify-${{ matrix.name }}.log || true
+              fi
+              exit 1
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+          done
+
+      - name: Run acceptance suite
+        env:
+          GRAFANA_URL: http://localhost:3001
+          CI: true
+        run: yarn e2e:acceptance
+
+      - name: Collect server logs
+        if: always()
+        run: |
+          if [ "${SERVER_MODE}" = "docker" ]; then
+            docker logs grafana-verify > /tmp/release-verify-${{ matrix.name }}.log 2>&1 || true
+          fi
+
+      - name: Upload server logs
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: release-verify-${{ matrix.name }}-server-log
+          path: /tmp/release-verify-${{ matrix.name }}.log
+          retention-days: 7
+
+      - name: Cleanup verify container
+        if: always()
+        run: |
+          if [ -f /tmp/release-verify-${{ matrix.name }}.pid ]; then
+            kill -9 "$(cat /tmp/release-verify-${{ matrix.name }}.pid)" || true
+          fi
+          docker rm -f grafana-verify || true

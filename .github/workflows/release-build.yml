@@ -39,7 +39,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Set up version (Release Branches)
@@ -124,7 +124,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node
@@ -181,7 +181,7 @@ jobs:
             os: darwin
             arch: arm64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-go
@@ -245,7 +245,7 @@ jobs:
             os: darwin
             arch: arm64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       # Artifact paths are relative to public/; extract under public/ so public/build exists for make.
@@ -284,11 +284,30 @@ jobs:
           path: dist
           retention-days: 1
 
+  verify-targz:
+    name: verify targz (linux-amd64)
+    needs:
+      - build-targz
+    uses: ./.github/workflows/release-verify.yml
+    with:
+      run-id: ${{ github.run_id }}
+      targz-artifact-name: artifacts-targz-linux-amd64
+
+  verify-packages:
+    name: verify packages (linux-amd64)
+    needs:
+      - build-packages
+    uses: ./.github/workflows/release-verify-packages.yml
+    with:
+      run-id: ${{ github.run_id }}
+      packages-artifact-name: artifacts-linux-amd64
+
   build-packages:
     runs-on: github-hosted-ubuntu-x64-large
     needs:
       - setup
       - build-targz
+      - verify-targz
     permissions:
       contents: read
       id-token: write
@@ -299,29 +318,22 @@ jobs:
         include:
           - name: linux-amd64
             artifacts: deb:grafana:linux/amd64,rpm:grafana:linux/amd64,docker:grafana:linux/amd64,docker:grafana:linux/amd64:ubuntu
-            verify: false
           - name: linux-arm64
             artifacts: deb:grafana:linux/arm64,rpm:grafana:linux/arm64,docker:grafana:linux/arm64,docker:grafana:linux/arm64:ubuntu
-            verify: false
           - name: linux-s390x
             artifacts: deb:grafana:linux/s390x,rpm:grafana:linux/s390x,docker:grafana:linux/s390x,docker:grafana:linux/s390x:ubuntu
-            verify: false
           - name: linux-armv7
             artifacts: deb:grafana:linux/arm/v7,docker:grafana:linux/arm/v7,docker:grafana:linux/arm/v7:ubuntu
-            verify: false
           - name: linux-armv6
             artifacts: deb:grafana:linux/arm/v6
-            verify: false
           - name: windows-amd64
             artifacts: zip:grafana:windows/amd64:nocgo,msi:grafana:windows/amd64:nocgo
-            verify: false
           - name: windows-arm64
             artifacts: zip:grafana:windows/arm64:nocgo
-            verify: false
     steps:
       - uses: grafana/shared-workflows/actions/dockerhub-login@dockerhub-login/v1.0.2
       - uses: grafana/shared-workflows/actions/login-to-gar@main
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
@@ -341,7 +353,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version: ${{ needs.setup.outputs.version }}
           output: artifacts-${{ matrix.name }}.txt
-          verify: ${{ matrix.verify }}
+          verify: false
           build-id: ${{ github.run_id }}
           cache-builders: true
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
@@ -363,7 +375,9 @@ jobs:
     needs:
       - setup
       - build-targz
+      - verify-targz
       - build-packages
+      - verify-packages
     with:
       bucket: grafana-prerelease
       pattern: artifacts-*
@@ -380,7 +394,9 @@ jobs:
     runs-on: ubuntu-x64-small
     needs:
       - setup
+      - verify-targz
       - build-packages
+      - verify-packages
     steps:
       - uses: grafana/shared-workflows/actions/dockerhub-login@dockerhub-login/v1.0.2
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
