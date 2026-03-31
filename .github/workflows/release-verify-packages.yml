@@ -52,6 +52,12 @@ jobs:
           run-id: ${{ inputs.run-id }}
           path: dist
 
+      - name: Install bsdtar for rpm extraction
+        if: matrix.name == 'rpm'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
+
       - name: Start package under test
         run: |
           PACKAGE_PATH="$(find dist -maxdepth 1 -type f -name '${{ matrix.pattern }}' | sort | sed -n '1p')"
@@ -98,7 +104,7 @@ jobs:
               ;;
             rpm)
               if ! command -v bsdtar >/dev/null 2>&1; then
-                echo "bsdtar is required to extract .rpm packages without yum"
+                echo "bsdtar not found; expected libarchive-tools to provide it"
                 exit 1
               fi
               mkdir -p grafana-server
