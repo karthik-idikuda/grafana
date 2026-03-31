@@ -40,8 +40,9 @@ type IndexMeta struct {
 //
 // Object storage layout:
 //
+//	/<namespace>/<group>.<resource>/<index-key>/index_meta.json
 //	/<namespace>/<group>.<resource>/<index-key>/store/root.bolt
-//	/<namespace>/<group>.<resource>/<index-key>/*.zap
+//	/<namespace>/<group>.<resource>/<index-key>/store/*.zap
 //	/<namespace>/<group>.<resource>/<index-key>/meta.json  <- uploaded last, signals complete upload
 type RemoteIndexStore interface {
 	// UploadIndex uploads a local index directory to remote storage.
@@ -114,8 +115,6 @@ func (s *remoteIndexStore) UploadIndex(ctx context.Context, nsResource resource.
 		if d.IsDir() || !d.Type().IsRegular() {
 			return nil
 		}
-		// Skip meta.json — we generate our own manifest and uploading a pre-existing
-		// one would cause a size mismatch on round-trip.
 		if d.Name() == metaJSONFile {
 			return nil
 		}
