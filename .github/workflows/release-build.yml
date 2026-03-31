@@ -31,7 +31,7 @@ permissions:
 jobs:
   setup:
     name: setup
-    runs-on: github-hosted-ubuntu-x64-small
+    runs-on: ubuntu-x64-small
     if: (github.repository == 'grafana/grafana') || (github.repository == 'grafana/grafana-security-mirror' && contains(github.ref_name, '+security'))
     outputs:
       version: ${{ steps.output.outputs.version }}
@@ -59,7 +59,7 @@ jobs:
           echo "grafana_commit=$(git rev-parse HEAD)" | tee -a "$GITHUB_OUTPUT"
   # Triggers the same workflow in `grafana-enterprise` on the same ref
   downstream:
-    runs-on: github-hosted-ubuntu-x64-small
+    runs-on: ubuntu-x64-small
     needs: [setup]
     permissions:
       contents: read
@@ -119,7 +119,7 @@ jobs:
 
   build-frontend:
     name: build frontend
-    runs-on: github-hosted-ubuntu-x64-large
+    runs-on: ubuntu-x64-large
     needs: [setup]
     permissions:
       contents: read
@@ -201,7 +201,7 @@ jobs:
 
   build-targz:
     name: targz / ${{ matrix.name }}
-    runs-on: github-hosted-ubuntu-x64-large
+    runs-on: ubuntu-x64-large
     needs:
       - setup
       - build-frontend
@@ -257,6 +257,9 @@ jobs:
         with:
           name: release-backend-${{ matrix.name }}
           path: bin/${{ matrix.os }}/${{ matrix.arch }}
+      - name: Fix binary permissions
+        if: matrix.os != 'windows'
+        run: chmod +x bin/${{ matrix.os }}/${{ matrix.arch }}/grafana*
       - name: Build tar.gz
         env:
           GOOS: ${{ matrix.os }}
@@ -303,11 +306,10 @@ jobs:
       packages-artifact-name: artifacts-linux-amd64
 
   build-packages:
-    runs-on: github-hosted-ubuntu-x64-large
+    runs-on: ubuntu-x64-large
     needs:
       - setup
       - build-targz
-      - verify-targz
     permissions:
       contents: read
       id-token: write

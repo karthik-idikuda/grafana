@@ -134,7 +134,7 @@ jobs:
           esac
 
       - name: Install Playwright browsers
-        run: yarn playwright install --with-deps chromium
+        run: yarn playwright install chromium --with-deps
 
       - name: Wait for Grafana server to start
         run: |
@@ -157,7 +157,15 @@ jobs:
         env:
           GRAFANA_URL: http://localhost:3001
           CI: true
-        run: yarn e2e:acceptance
+        run: yarn e2e:acceptance --reporter=dot,blob --output=playwright-test-results
+
+      - name: Upload Playwright blob report
+        if: success() || failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: release-verify-${{ matrix.name }}-playwright-blob
+          path: blob-report
+          retention-days: 1
 
       - name: Collect server logs
         if: always()

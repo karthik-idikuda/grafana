@@ -50,6 +50,9 @@ jobs:
           mkdir -p grafana-server
           tar --strip-components=1 -xzf "$TARBALL" -C grafana-server
 
+      - name: Fix binary permissions
+        run: chmod +x grafana-server/bin/grafana*
+
       - name: Configure for e2e tests
         run: |
           mkdir -p grafana-server/conf/provisioning/{datasources,dashboards,alerting,plugins}
@@ -69,7 +72,7 @@ jobs:
             > grafana-server/grafana.log 2>&1 &
 
       - name: Install Playwright browsers
-        run: yarn playwright install --with-deps chromium
+        run: yarn playwright install chromium --with-deps
 
       - name: Wait for Grafana server to start
         run: |
@@ -88,7 +91,15 @@ jobs:
         env:
           GRAFANA_URL: http://localhost:3001
           CI: true
-        run: yarn e2e:acceptance
+        run: yarn e2e:acceptance --reporter=dot,blob --output=playwright-test-results
+
+      - name: Upload Playwright blob report
+        if: success() || failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: release-verify-playwright-blob
+          path: blob-report
+          retention-days: 1
 
       - name: Upload server log
         if: always()
